@@ -6,6 +6,7 @@ extern "C" {
 #include "samtools/faidx.h"
 #include "samtools/faidx_t.h"
 #include "samtools/sam.h"
+#include "snprintf.h"
 
 #include <R.h>
 #include <Rinternals.h>

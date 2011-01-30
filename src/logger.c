@@ -1,6 +1,6 @@
 
-
 #include "logger.h"
+#include "snprintf.h"
 
 #include <R.h>
 #include <R_ext/Print.h>
@@ -10,6 +10,7 @@
 #include <string.h>
 #include <stdarg.h>
 #include <stdbool.h>
+
 
 const char* INDENT = "  ";
 

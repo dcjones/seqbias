@@ -118,7 +118,7 @@ configure:2948: result: yes
 configure:2948: checking for pow
 configure:2948: gcc -o conftest -g -O2   conftest.c -lz  >&5
 conftest.c:35: warning: conflicting types for built-in function 'pow'
-/tmp/ccxSNas5.o: In function `main':
+/tmp/cc2oJinr.o: In function `main':
 /home/dcjones/bio/seqbias/conftest.c:46: undefined reference to `pow'
 collect2: ld returned 1 exit status
 configure:2948: $? = 1
@@ -176,7 +176,7 @@ configure:2948: result: no
 configure:2948: checking for sqrt
 configure:2948: gcc -o conftest -g -O2   conftest.c -lz  >&5
 conftest.c:35: warning: conflicting types for built-in function 'sqrt'
-/tmp/ccFZLqEa.o: In function `main':
+/tmp/ccFdFAsw.o: In function `main':
 /home/dcjones/bio/seqbias/conftest.c:46: undefined reference to `sqrt'
 collect2: ld returned 1 exit status
 configure:2948: $? = 1

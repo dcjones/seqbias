@@ -2,6 +2,7 @@
 #include "sequencing_bias.hpp"
 #include "logger.h"
 #include "common.hpp"
+#include "miscmath.hpp"
 
 #include <cmath>
 #include <cctype>
@@ -14,9 +15,29 @@ using namespace std;
 
 
 /* simply uniform random numbers */
-double rand_uniform( double a, double b )
+static double rand_uniform( double a, double b )
 {
     return a + b * (double)rand() / (double)RAND_MAX;
+}
+
+/* random gaussians (copied from GSL, to avoid dependency) */
+static double rand_gauss( double sigma )
+{
+    double x, y, r2;
+
+    do
+    {
+        /* choose x,y in uniform square (-1,-1) to (+1,+1) */
+        x = -1 + 2 * rand_uniform(0.0,1.0);
+        y = -1 + 2 * rand_uniform(0.0,1.0);
+
+        /* see if it is in the unit circle */
+        r2 = x * x + y * y;
+    }
+    while (r2 > 1.0 || r2 == 0);
+
+    /* Box-Muller transform */
+    return sigma * y * sqrt (-2.0 * log (r2) / r2);
 }
 
 
@@ -172,14 +193,14 @@ void sequencing_bias::build( const char* ref_fn,
         failf( "Can't open bam file '%s'.\n", reads_fn );
     }
 
+    /* find the first n unique reads by hashing */
     table T;
-    hash_reads( &T, reads_f, n );
-    n = T.m;
+    hash_reads( &T, reads_f, 0 );
 
-    /* resort the remaining (1-q)*n by position */
-    log_puts( LOG_MSG, "sorting by position ... " );
+    /* sort by position */
+    log_puts( LOG_MSG, "shuffling ... " );
     struct hashed_value** S;
-    table_sort_by_position( &T, &S );
+    table_sort_by_seq_rand( &T, &S );
     log_puts( LOG_MSG, "done.\n" );
 
 
@@ -196,13 +217,12 @@ void sequencing_bias::build( const char* ref_fn,
     std::deque<sequence*> training_seqs;
 
 
-    /* sample this many background sequence for each foreground sequence */
-    const int bg_count = 1;
+    /* background sampling */
+    const size_t bg_samples = 1; // make this many samples for each read
+    int bg_sample_num;           // keep track of the number of samples made
+    struct read_pos bg;          // background position being considered
     
-    int j;
-    pos bg_pos;
-    pos bg_offset;
-
+    int b;
     char*          seqname   = NULL;
     int            seqlen    = 0;
     int            curr_tid  = -1;
@@ -213,7 +233,7 @@ void sequencing_bias::build( const char* ref_fn,
     local_seq[L+R+1] = '\0';
 
 
-    for( i = 0; i < n; i++ ) {
+    for( i = 0; i < n && i < T.m; i++ ) {
 
         /* Load/switch sequences (chromosomes) as they are encountered in the
          * read stream. The idea here is to avoid thrashing by loading a large
@@ -241,7 +261,8 @@ void sequencing_bias::build( const char* ref_fn,
         }
 
         if( seq == NULL ) continue;
-        
+
+
         /* add a foreground sequence */
         if( S[i]->pos.strand ) {
             if( S[i]->pos.pos < R ) continue;
@@ -258,31 +279,29 @@ void sequencing_bias::build( const char* ref_fn,
 
         /* add a background sequence */
         /* adjust the current read position randomly, and sample */
-        for( j = 0; j < bg_count; j++ ) {
+        for( bg_sample_num = 0; bg_sample_num < bg_samples; bg_sample_num++ ) {
 
-            /* make things a bit more robust by sampling the background from a
-             * random offset */
-            bg_offset = (pos)rand_uniform( 100.0, 200.0 );
-            if( rand_uniform( -1.0, 1.0 ) < 0.0 ) bg_offset = -bg_offset;
+            /* attempt to sample a position near the current read, with no reads
+             * itself. */
+            memcpy( (void*)&bg, (void*)&S[i]->pos, sizeof(struct read_pos) );
 
-            bg_pos = S[i]->pos.pos + bg_offset;
+            bg.pos = S[i]->pos.pos + (pos)ceil( rand_gauss( 10 ) );
 
-            if( S[i]->pos.strand ) {
-                if( bg_pos < R ) continue;
-                memcpy( local_seq, seq + bg_pos - R, (L+1+R)*sizeof(char) );
+            if( bg.strand ) {
+                if( bg.pos < R ) continue;
+                memcpy( local_seq, seq + bg.pos - R, (L+1+R)*sizeof(char) );
                 seqrc( local_seq, L+1+R );
             }
             else {
-                if( bg_pos < L ) continue;
-                memcpy( local_seq, seq + (bg_pos-L), (L+1+R)*sizeof(char) );
+                if( bg.pos < L ) continue;
+                memcpy( local_seq, seq + (bg.pos-L), (L+1+R)*sizeof(char) );
             }
 
             training_seqs.push_back( new sequence( local_seq, 0 ) );
         }
     }
 
-
-    size_t max_k = 5;
+    size_t max_k = 3;
     size_t max_dep_dist = 5;
     M0 = new motif( L+1+R, max_k, 0 );
     M1 = new motif( L+1+R, max_k, 1 );

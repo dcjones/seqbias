@@ -9,10 +9,11 @@ YAML_CPP_OBJ = aliascontent.o conversion.o emitter.o emitterstate.o \
                stream.o tag.o
 
 SEQBIAS_OBJ = sequencing_bias.o kmers.o miscmath.o common.o \
-			  table.o superfasthash.o logger.o seqbias.o
+			  table.o superfasthash.o logger.o seqbias.o \
+			  snprintf.o
 
-DFLAGS = -D_USE_KNETFILE -D_FILE_OFFSET_BITS=64 -D_GNU_SOURCE
-PKG_CFLAGS  += $(DFLAGS) -Wno-unused-result -Wno-format
+DFLAGS = -D_USE_KNETFILE -D_FILE_OFFSET_BITS=64
+PKG_CFLAGS  += $(DFLAGS)
 PKG_CPPFLAGS = $(PKG_CFLAGS)
 
 PKG_LIBS+=@LIBS@

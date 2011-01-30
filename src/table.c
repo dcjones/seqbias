@@ -147,6 +147,36 @@ void rehash( struct table* T, size_t new_n )
     T->min_m = T->n*MIN_LOAD;
 }
 
+
+int compare_seq_hash( const void* x, const void* y )
+{
+    struct hashed_value* const * a = x;
+    struct hashed_value* const * b = y;
+
+    int c = (*a)->pos.tid - (*b)->pos.tid;
+    if( c == 0 ) {
+        uint32_t ha = hash( (void*)&(*a)->pos, sizeof(struct read_pos) );
+        uint32_t hb = hash( (void*)&(*b)->pos, sizeof(struct read_pos) );
+        return (int32_t)a - (int32_t)b;
+    }
+    else return c;
+
+}
+
+int compare_seq_count( const void* x, const void* y )
+{
+    struct hashed_value* const * a = x;
+    struct hashed_value* const * b = y;
+
+    int c = (*a)->pos.tid - (*b)->pos.tid;
+    if( c == 0 ) {
+        if( (*a)->count == (*b)->count ) return 0;
+        else return (*a)->count > (*b)->count ? 1 : -1;
+    }
+    else return c;
+}
+
+
 int compare_count( const void* x, const void* y )
 {
     struct hashed_value* const * a = x;
@@ -155,11 +185,11 @@ int compare_count( const void* x, const void* y )
     return (*a)->count - (*b)->count;
 }
 
+
 int compare_hashed_pos( const void* x, const void* y )
 {
     struct hashed_value* const * a = x;
     struct hashed_value* const * b = y;
-
 
     int c = (*a)->pos.tid - (*b)->pos.tid;
     if( c == 0 ) {
@@ -193,6 +223,19 @@ void sort_table( struct table* T,
     *S_ = S;
 }
 
+void table_sort_by_seq_rand( struct table* T,
+                             struct hashed_value*** S_ )
+{
+    sort_table( T, S_, compare_seq_hash );
+}
+
+void table_sort_by_seq_count( struct table* T,
+                              struct hashed_value*** S_ )
+{
+    sort_table( T, S_, compare_seq_count );
+}
+
+
 void table_sort_by_count( struct table* T,
                     struct hashed_value*** S_ )
 {
@@ -206,19 +249,14 @@ void table_sort_by_position( struct table* T,
 }
 
 
-bool table_member( struct table* T, bam1_t* read )
+bool table_member( struct table* T, struct read_pos* pos )
 {
-    struct read_pos pos;
-    pos.tid = read->core.tid;
-    pos.pos = read->core.pos;
-    pos.strand = bam1_strand(read);
-
-    uint32_t h = hash((void*)&pos, sizeof(struct read_pos)) % T->n;
+    uint32_t h = hash((void*)pos, sizeof(struct read_pos)) % T->n;
 
     struct hashed_value* u = T->A[h];
 
     while(u) {
-        if( memcmp( &u->pos, &pos, sizeof(struct read_pos) ) == 0 ) {
+        if( memcmp( &u->pos, pos, sizeof(struct read_pos) ) == 0 ) {
             return true;
         }
 

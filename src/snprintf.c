@@ -240,10 +240,6 @@
  * with "ap2 = ap", in this case you must not call va_end(ap2) !
  *   #define va_copy(ap2,ap) ap2 = ap
  */
-/* #define NEED_ASPRINTF   */
-/* #define NEED_ASNPRINTF  */
-/* #define NEED_VASPRINTF  */
-/* #define NEED_VASNPRINTF */
 
 
 /* Define the following macros if desired:
@@ -283,6 +279,15 @@
 /* ============================================= */
 /* NO USER SERVICABLE PARTS FOLLOWING THIS POINT */
 /* ============================================= */
+
+#ifdef _GNU_SOURCE
+#define HAVE_SNPRINTF
+#else
+#define NEED_ASPRINTF  
+#define NEED_ASNPRINTF 
+#define NEED_VASPRINTF 
+#define NEED_VASNPRINTF
+#endif
 
 #define PORTABLE_SNPRINTF_VERSION_MAJOR 2
 #define PORTABLE_SNPRINTF_VERSION_MINOR 2

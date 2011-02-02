@@ -270,7 +270,7 @@ void dealloc_kmer_matrix( SEXP M )
 
 SEXP seqbias_alloc_kmer_matrix( SEXP n, SEXP k )
 {
-    int c_n, c_k;
+    int c_n = 0, c_k = 0;
 
     if( !IS_INTEGER(n) || (c_n = asInteger(n)) <= 0) {
         error( "'n' must be a positive integer" );
@@ -306,7 +306,7 @@ SEXP seqbias_tally_kmers( SEXP M, SEXP seq, SEXP count, SEXP offset )
     pos c_offset = asInteger(offset);
 
     size_t n = strlen(c_seq);
-    if( LENGTH(count) != n ) error( "sequence length mismatches count length" );
+    if( (size_t)LENGTH(count) != n ) error( "sequence length mismatches count length" );
 
     size_t k = c_M->getk();
 
@@ -314,13 +314,13 @@ SEXP seqbias_tally_kmers( SEXP M, SEXP seq, SEXP count, SEXP offset )
      * Convert the sequence to an array of kmers.
      */
 
-    int i;
+    size_t i;
     kmer kmer_mask = 0;
     for( i = 0; i < k; i++ ) kmer_mask = (kmer_mask<<2) | 0x3;
 
     kmer* ks = new kmer[n - (k - 1)];
     memset( ks, 0, (n - (k - 1)) * sizeof(kmer) );
-    kmer K;
+    kmer K = 0;
     for( i = 0; i < n; i++ ) {
         K = ((K << 2) | nt2num(c_seq[i])) & kmer_mask;
         if( i >= k-1 ) ks[i-(k-1)] = K;
@@ -332,9 +332,12 @@ SEXP seqbias_tally_kmers( SEXP M, SEXP seq, SEXP count, SEXP offset )
      */
     pos j;
     for( i = 0; i < n; i++ ) {
-        if( i >= c_offset && i - c_offset + c_M->getn() <= n && REAL(count)[i] > 0.0 ) {
-            for( j = 0; j < c_M->getn(); j++ ) {
-                (*c_M)( j, ks[i - c_offset + j] ) += REAL(count)[i];
+        if( (pos)i >= c_offset &&
+            (pos)i - c_offset + c_M->getn() <= n &&
+            REAL(count)[i] > 0.0 )
+        {
+            for( j = 0; (size_t)j < c_M->getn(); j++ ) {
+                (*c_M)( j, ks[(pos)i - c_offset + j] ) += REAL(count)[i];
                 //(*c_M)( j, ks[i - c_offset + j] ) += 1;
             }
         }
@@ -371,7 +374,7 @@ SEXP seqbias_dataframe_from_kmer_matrix( SEXP M, SEXP offset )
 
     char* Kstr = new char[k+1];
 
-    for( i = 0; i < n; i++ ) {
+    for( i = 0; (size_t)i < n; i++ ) {
         for( K = 0; K < m; K++ ) {
 
             /* set pos */

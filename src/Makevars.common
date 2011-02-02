@@ -1,0 +1,18 @@
+
+SAMTOOLS_OBJ = bam_aux.o bam.o bam_import.o bam_index.o bam_pileup.o \
+               bgzf.o faidx.o knetfile.o kstring.o razf.o sam.o sam_header.o
+              
+YAML_CPP_OBJ = aliascontent.o conversion.o emitter.o emitterstate.o \
+               emitterutils.o exp.o iterator.o map.o node.o null.o \
+               ostream.o parser.o parserstate.o regex.o scalar.o scanner.o \
+               scanscalar.o scantag.o scantoken.o sequence.o simplekey.o \
+               stream.o tag.o
+
+SEQBIAS_OBJ = sequencing_bias.o kmers.o miscmath.o common.o \
+			  table.o superfasthash.o logger.o seqbias.o \
+			  snprintf.o
+
+DFLAGS = -D_USE_KNETFILE -D_FILE_OFFSET_BITS=64
+PKG_CFLAGS  += $(DFLAGS) -Wall
+PKG_CPPFLAGS = $(PKG_CFLAGS)
+

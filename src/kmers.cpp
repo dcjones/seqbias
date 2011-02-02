@@ -81,11 +81,11 @@ void kmer_matrix::to_yaml( YAML::Emitter& out ) const
     out << YAML::BeginMap;
 
     out << YAML::Key   << "k";
-    out << YAML::Value << k;
+    out << YAML::Value << (unsigned int)k;
     out << YAML::Key   << "n";
-    out << YAML::Value << n;
+    out << YAML::Value << (unsigned int)n;
     out << YAML::Key   << "m";
-    out << YAML::Value << m;
+    out << YAML::Value << (unsigned int)m;
     out << YAML::Key   << "A";
     out << YAML::Flow;
     out << YAML::Value;
@@ -329,10 +329,10 @@ void motif::to_yaml( YAML::Emitter& out ) const
     out << YAML::BeginMap;
 
     out << YAML::Key   << "n";
-    out << YAML::Value << n;
+    out << YAML::Value << (unsigned int)n;
 
     out << YAML::Key   << "k";
-    out << YAML::Value << k;
+    out << YAML::Value << (unsigned int)k;
 
     out << YAML::Key   << "c";
     out << YAML::Value << c;

@@ -219,10 +219,9 @@ void sequencing_bias::build( const char* ref_fn,
 
     /* background sampling */
     const size_t bg_samples = 1; // make this many samples for each read
-    int bg_sample_num;           // keep track of the number of samples made
+    size_t bg_sample_num;        // keep track of the number of samples made
     struct read_pos bg;          // background position being considered
     
-    int b;
     char*          seqname   = NULL;
     int            seqlen    = 0;
     int            curr_tid  = -1;

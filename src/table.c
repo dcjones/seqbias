@@ -157,7 +157,7 @@ int compare_seq_hash( const void* x, const void* y )
     if( c == 0 ) {
         uint32_t ha = hash( (void*)&(*a)->pos, sizeof(struct read_pos) );
         uint32_t hb = hash( (void*)&(*b)->pos, sizeof(struct read_pos) );
-        return (int32_t)a - (int32_t)b;
+        return (int32_t)ha - (int32_t)hb;
     }
     else return c;
 

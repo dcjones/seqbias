@@ -118,7 +118,8 @@ void failf( const char* fmt, ... )
 
     va_end(ap);
 
-    fail( outstr );
+    if( outstrlen ) fail( outstr );
+    else            fail( "" );
     free( outstr );
 }
 

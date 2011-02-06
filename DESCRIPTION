@@ -1,5 +1,5 @@
 Package: seqbias
-Version: 0.99.3
+Version: 0.99.4
 Date: 25-12-2010
 Title: Estimation of per-position bias in high-throughput sequencing data
 Description: This package implements a model of per-position sequencing bias in

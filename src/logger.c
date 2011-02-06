@@ -1,6 +1,6 @@
 
 #include "logger.h"
-#include "snprintf.h"
+#include "asprintf.h"
 
 #include <R.h>
 #include <R_ext/Print.h>

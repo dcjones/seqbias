@@ -3,8 +3,9 @@ PKG_LIBS+=@LIBS@
 
 include Makevars.common
 
-
-OBJECTS = $(SEQBIAS_OBJ) $(SAMTOOLS_OBJ:%=samtools/%) $(YAML_CPP_OBJ:%=yaml-cpp/%)
+OBJECTS = $(SEQBIAS_OBJ) \
+		  $(SAMTOOLS_OBJ:%=samtools/%) \
+		  $(YAML_CPP_OBJ:%=yaml-cpp/%)
 
 all : $(SHLIB)
 

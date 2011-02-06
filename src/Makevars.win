@@ -1,10 +1,13 @@
 
-PKG_LIBS+=-$(ZLIB_LIBS) -lws2_32
-PKG_CFLAGS+=-D_LARGEFILE64_SOURCE
+PKG_LIBS+=$(ZLIB_LIBS) -lws2_32
+PKG_CFLAGS+=-D_LARGEFILE64_SOURCE -DNEED_ASPRINTF
 
 include Makevars.common
 
-OBJECTS = $(SEQBIAS_OBJ) $(SAMTOOLS_OBJ:%=samtools/%) $(YAML_CPP_OBJ:%=yaml-cpp/%)
+OBJECTS = $(SEQBIAS_OBJ) \
+		  $(SAMTOOLS_OBJ:%=samtools/%) \
+		  $(YAML_CPP_OBJ:%=yaml-cpp/%) \
+		  $(GNULIB_OBJ:%=gnulib/%)
 
 all : $(SHLIB)
 

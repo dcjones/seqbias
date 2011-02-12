@@ -30,6 +30,11 @@
 
 #include "vasnprintf.h"
 
+#ifndef EOVERFLOW
+#define EOVERFLOW 75
+#endif
+
+
 int
 vasprintf (char **resultp, const char *format, va_list args)
 {

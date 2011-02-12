@@ -54,9 +54,9 @@
 #ifndef VASNPRINTF
 /*# include <config.h>*/
 #endif
-#ifndef IN_LIBINTL
-# include <alloca.h>
-#endif
+/*#ifndef IN_LIBINTL*/
+/*# include <alloca.h>*/
+/*#endif*/
 
 /* Specification.  */
 #ifndef VASNPRINTF

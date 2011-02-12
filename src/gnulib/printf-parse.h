@@ -24,7 +24,7 @@
      STATIC             Set to 'static' to declare the function static.  */
 
 //#if HAVE_FEATURES_H
-# include <features.h> /* for __GLIBC__, __UCLIBC__ */
+//# include <features.h> [> for __GLIBC__, __UCLIBC__ <]
 //#endif
 
 #include "printf-args.h"

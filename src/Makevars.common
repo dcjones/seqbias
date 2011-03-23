@@ -1,7 +1,11 @@
 
-SAMTOOLS_OBJ = bam_aux.o bam.o bam_import.o bam_index.o bam_pileup.o \
-               bgzf.o faidx.o knetfile.o kstring.o razf.o sam.o sam_header.o
-              
+MYPKG_PATH=`echo 'cat(system.file("usrlib", \
+                      .Platform[["r_arch"]], \
+                      package="Rsamtools", mustWork=TRUE))' | \
+                  ${R_HOME}/bin/R --vanilla --slave`
+
+PKG_LIBS=-L$(MYPKG_PATH) -lbam
+
 YAML_CPP_OBJ = aliascontent.o conversion.o emitter.o emitterstate.o \
                emitterutils.o exp.o iterator.o map.o node.o null.o \
                ostream.o parser.o parserstate.o regex.o scalar.o scanner.o \

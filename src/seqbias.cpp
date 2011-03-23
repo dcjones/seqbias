@@ -4,7 +4,6 @@
 extern "C" {
 
 #include "samtools/faidx.h"
-#include "samtools/faidx_t.h"
 #include "samtools/sam.h"
 #include "asprintf.h"
 
@@ -220,23 +219,27 @@ SEXP seqbias_count_reads( SEXP bam_ptr,
     coerce_genomic_coords( seqname, start, end, strand,
                            &c_seqname, &c_start, &c_end, &c_strand );
                            
+
+    /* init vector */
+    SEXP v;
+    PROTECT( v = allocVector( REALSXP, c_end - c_start + 1 ) );
+    pos i;
+    for( i = 0; i < c_end - c_start + 1; i++ ) REAL(v)[i] = 0;
+
+
     char* region;
     int bam_ref_id, bam_start, bam_end, err;
     err = asprintf( &region, "%s:%ld-%ld", c_seqname, c_start, c_end );
     err = bam_parse_region( c_bam_ptr->f->header, region,
                             &bam_ref_id, &bam_start, &bam_end );
-
-    if( err != 0 || bam_ref_id < 0 ) {
-        fprintf( stderr, "%s\n", region );
-        error( "invalid region encountered" );
-    }
-
     free(region);
 
-    SEXP v;
-    PROTECT( v = allocVector( REALSXP, c_end - c_start + 1 ) );
-    pos i;
-    for( i = 0; i < c_end - c_start + 1; i++ ) REAL(v)[i] = 0;
+    /* if the region is not present in the bam file index, just return 0's */
+    if( err != 0 || bam_ref_id < 0 ) {
+        UNPROTECT(1);
+        return v;
+    }
+
 
     bam_iter_t it = bam_iter_query( c_bam_ptr->idx, bam_ref_id, bam_start, bam_end );
     bam1_t* b = bam_init1();

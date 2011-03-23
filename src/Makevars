@@ -1,10 +1,7 @@
 
-PKG_LIBS+=-lz 
-
 include Makevars.common
 
 OBJECTS = $(SEQBIAS_OBJ) \
-		  $(SAMTOOLS_OBJ:%=samtools/%) \
 		  $(YAML_CPP_OBJ:%=yaml-cpp/%)
 
 all : $(SHLIB)

@@ -5,6 +5,8 @@
 #include <algorithm>
 #include <cstdlib>
 #include "samtools/faidx.h"
+#include "samtools/sam.h"
+#include "samtools/bam.h"
 
 
 typedef long          pos;     /* genomic position */
@@ -22,6 +24,12 @@ void rev( T* xs, int n ) {
     int i = 0;
     int j = n-1;
     while( i < j ) std::swap(xs[i++],xs[j--]);
+}
+
+
+/* defined in bam_aux.c */
+extern "C" {
+void bam_init_header_hash(bam_header_t *header);
 }
 
 /* Change the behavior of the faidx_fetch_seq function to be more useful. If

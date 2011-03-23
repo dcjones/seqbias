@@ -7,7 +7,6 @@
 #include "kmers.hpp"
 #include "table.h"
 
-#include "samtools/sam.h"
 #include "samtools/faidx.h"
 
 class sequencing_bias
@@ -18,9 +17,15 @@ class sequencing_bias
 
         sequencing_bias( const char* ref_fn,
                          const char* reads_fn,
-                         size_t n, pos L, pos R,
-                         bool   train_backwards = false,
-                         double complexity_penalty = 1.0 );
+                         size_t max_reads, pos L, pos R,
+                         double complexity_penalty = 1.0,
+                         double offset_std = 50.0 );
+
+        sequencing_bias( const char* ref_fn,
+                         table* T, size_t max_reads,
+                         pos L, pos R,
+                         double complexity_penalty = 1.0,
+                         double offset_std = 50.0 );
 
         ~sequencing_bias();
 
@@ -36,16 +41,18 @@ class sequencing_bias
 
     private:
         sequencing_bias();
+
         void build( const char* ref_fn,
                     const char* reads_fn,
-                    size_t n, pos L, pos R,
-                    bool   train_backwards = false,
-                    double complexity_penalty = 1.0 );
+                    size_t max_reads, pos L, pos R,
+                    double complexity_penalty,
+                    double offset_std );
 
-
-        void hash_reads( table* T, samfile_t* reads_fn,
-                         size_t limit = 0 ) const;
-
+        void build( const char* ref_fn,
+                    table* T, size_t max_reads,
+                    pos L, pos R,
+                    double complexity_penalty,
+                    double offset_std );
 
 
         /* left and right sequence context */

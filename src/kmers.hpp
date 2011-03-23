@@ -32,8 +32,11 @@ class kmer_matrix
 
         void to_yaml( YAML::Emitter& out ) const;
 
-        void   setall( double x );
-        void   setrow( size_t i, double x );
+        void setall( double x );
+        void setrowall( size_t i, double x );
+
+        void getrow( size_t i, double* x );
+        void setrow( size_t i, double* x );
 
         size_t getn() const;
         size_t getm() const;
@@ -47,24 +50,15 @@ class kmer_matrix
         void dist_marginalize( size_t i, size_t j );
 
         void dist_conditionalize( int effective_k = -1 );
-        void dist_conditionalize_row( size_t i, int effective_k = -1 );
+        void dist_conditionalize_row( size_t i, size_t j, int effective_k = -1 );
         void log_transform_row( size_t i, int effective_k = -1 );
-
-        /* allows one row to be stored then reset, which is used when searching
-         * for the optimal edge to add when training the model */
-        void store_row( size_t i );
-        void restore_stored_row();
-
 
     private:
 
-        size_t k;
-        
-        size_t n, m;
+        size_t k; // size of k-mer
+        size_t n; // number of positions
+        size_t m; // 4^k
         double* A;
-
-        double* stored_row;
-        size_t stored_row_index;
 };
 
 
@@ -76,7 +70,7 @@ class kmer_matrix
 class sequence
 {
     public:
-        sequence( const char* s, int c = 0 );
+        sequence( const char* s, int c = 0, double w = 1.0 );
         sequence( const sequence& );
         void operator=( const sequence& );
         ~sequence();
@@ -85,6 +79,7 @@ class sequence
         bool get( const bool* indexes, size_t maxn, kmer& K, size_t offset = 0 ) const;
 
         int c; /* class (i.e. foreground (0) or foreground (1)) */
+        double w;
 
     private:
         kmer* xs;
@@ -112,7 +107,6 @@ class motif
 
         void add_edge( size_t i, size_t j, const std::deque<sequence*>* data );
         void remove_edge( size_t i, size_t j, const std::deque<sequence*>* data );
-        void add_all_edges( const std::deque<sequence*>* data );
 
         double eval( const sequence&, size_t offset = 0 ) const;
         double eval_node( size_t i, const std::deque<sequence*>* data,
@@ -120,8 +114,6 @@ class motif
 
         size_t num_params() const;
 
-        void store_row( size_t i );
-        void restore_stored_row();
         char* print_model_graph( int offset = 0 );
 
         int c; /* which subset of the training data to consider */
@@ -132,6 +124,9 @@ class motif
         bool has_edge( size_t i, size_t j );
         void set_edge( size_t i, size_t j, bool );
 
+        bool reachable( size_t i, size_t j );
+        void compute_reachability();
+
 
         void update_likelihood_column( double* L, size_t n, size_t m, size_t j,
                                        const std::deque<sequence*>* training_seqs );
@@ -141,6 +136,7 @@ class motif
         kmer_matrix* P;
 
         bool* parents;
+        bool* R; // reachability
 
         static const double pseudocount;
 
@@ -149,19 +145,12 @@ class motif
                                   const std::deque<sequence*>* training_seqs,
                                   size_t max_dep_dist, double complexity_penalty );
 
-        friend void train_motifs_backwards( motif& M0, motif& M1,
-                                            const std::deque<sequence*>* training_seqs,
-                                            size_t max_dep_dist, double complexity_penalty );
 };
 
 void train_motifs( motif& M0, motif& M1,
                    const std::deque<sequence*>* training_seqs,
                    size_t max_dep_dist = 0, double complexity_penalty = 1.0 );
 
-void train_motifs_backwards( motif& M0, motif& M1,
-                             const std::deque<sequence*>* training_seqs,
-                             size_t max_dep_dist = 0, double complexity_penalty = 1.0 );
-                   
 
 
 

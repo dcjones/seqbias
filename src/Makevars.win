@@ -1,15 +1,5 @@
-
-PKG_LIBS+=-lws2_32
-PKG_CFLAGS+=-D_LARGEFILE64_SOURCE -DNEED_ASPRINTF
-
 include Makevars.common
-
+PKG_CPPFLAGS+=-DNEED_ASPRINTF
 OBJECTS = $(SEQBIAS_OBJ) \
 		  $(YAML_CPP_OBJ:%=yaml-cpp/%) \
 		  $(GNULIB_OBJ:%=gnulib/%)
-
-all : $(SHLIB)
-
-clean:
-	rm -f $(OBJECTS)
-

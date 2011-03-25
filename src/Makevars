@@ -1,11 +1,5 @@
-
 include Makevars.common
 
 OBJECTS = $(SEQBIAS_OBJ) \
 		  $(YAML_CPP_OBJ:%=yaml-cpp/%)
-
-all : $(SHLIB)
-
-clean:
-	rm -f $(OBJECTS)
 

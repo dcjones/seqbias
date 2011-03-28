@@ -368,12 +368,12 @@ void sequencing_bias::build( const char* ref_fn,
 
         /* add a foreground sequence */
         if( S[i].strand ) {
-            if( S[i].pos < R ) continue;
+            if( S[i].pos < R || S[i].pos >= seqlen - L ) continue;
             memcpy( local_seq, seq + S[i].pos - R, (L+1+R)*sizeof(char) );
             seqrc( local_seq, L+1+R );
         }
         else {
-            if( S[i].pos < L ) continue;
+            if( S[i].pos < L || S[i].pos >= seqlen - R ) continue;
             memcpy( local_seq, seq + (S[i].pos-L), (L+1+R)*sizeof(char) );
         }
 
@@ -388,12 +388,12 @@ void sequencing_bias::build( const char* ref_fn,
             bg_pos = S[i].pos + (pos)ceil( rand_trunc_gauss( offset_std, -100, 100 ) );
 
             if( S[i].strand ) {
-                if( bg_pos < R ) continue;
+                if( bg_pos < R || S[i].pos >= seqlen - L ) continue;
                 memcpy( local_seq, seq + bg_pos - R, (L+1+R)*sizeof(char) );
                 seqrc( local_seq, L+1+R );
             }
             else {
-                if( bg_pos < L ) continue;
+                if( bg_pos < L || S[i].pos >= seqlen - R ) continue;
                 memcpy( local_seq, seq + (bg_pos-L), (L+1+R)*sizeof(char) );
             }
 

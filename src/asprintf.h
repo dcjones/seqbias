@@ -11,8 +11,15 @@ extern "C" {
 #ifndef NEED_ASPRINTF
 #include <stdio.h>
 #else
-int asprintf (char **resultp, const char *format, ...);
+
+#include <stdarg.h>
+
 /* defined in gnulib/asprintf.c */
+int asprintf (char **resultp, const char *format, ...);
+
+/* defined in gnulib/vasprintf.c */
+int vasprintf(char **strp, const char *fmt, va_list ap);
+
 #endif
 
 

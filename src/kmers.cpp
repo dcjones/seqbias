@@ -3,6 +3,7 @@
 #include "common.hpp"
 #include "miscmath.hpp"
 #include "logger.h"
+#include "asprintf.h"
 
 #include <string>
 #include <cstring>

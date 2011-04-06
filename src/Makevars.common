@@ -16,5 +16,6 @@ SEQBIAS_OBJ = sequencing_bias.o kmers.o miscmath.o common.o \
 
 GNULIB_OBJ = asprintf.o printf-args.o printf-parse.o vasnprintf.o vasprintf.o
 
-PKG_CFLAGS  += -Wall -D_GNU_SOURCE
+PKG_CFLAGS   += -Wall
+PKG_CXXFLAGS += -Wall
 

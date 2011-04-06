@@ -70,11 +70,11 @@ void kmer_matrix::to_yaml( YAML::Emitter& out ) const
     out << YAML::BeginMap;
 
     out << YAML::Key   << "k";
-    out << YAML::Value << k;
+    out << YAML::Value << (unsigned int)k;
     out << YAML::Key   << "n";
-    out << YAML::Value << n;
+    out << YAML::Value << (unsigned int)n;
     out << YAML::Key   << "m";
-    out << YAML::Value << m;
+    out << YAML::Value << (unsigned int)m;
     out << YAML::Key   << "A";
     out << YAML::Flow;
     out << YAML::Value;
@@ -335,13 +335,13 @@ void motif::to_yaml( YAML::Emitter& out ) const
     out << YAML::BeginMap;
 
     out << YAML::Key   << "n";
-    out << YAML::Value << n;
+    out << YAML::Value << (unsigned int)n;
 
     out << YAML::Key   << "k";
-    out << YAML::Value << k;
+    out << YAML::Value << (unsigned int)k;
 
     out << YAML::Key   << "c";
-    out << YAML::Value << c;
+    out << YAML::Value << (unsigned int)c;
 
     out << YAML::Key << "parents";
     out << YAML::Value;
@@ -722,7 +722,7 @@ void train_motifs( motif& M0, motif& M1,
     while( true ) {
         round_num++;
 
-        log_printf( LOG_MSG, "round %4d (ic = %0.4e) ", round_num, ic_curr );
+        log_printf( LOG_MSG, "round %4zu (ic = %0.4e) ", round_num, ic_curr );
         col = 0;
 
         ic_forw_best = ic_back_best = ic_rev_best = -HUGE_VAL;

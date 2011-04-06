@@ -383,21 +383,22 @@ void sequencing_bias::build( const char* ref_fn,
 
         /* add a background sequence */
         /* adjust the current read position randomly, and sample */
-        for( bg_sample_num = 0; bg_sample_num < bg_samples; bg_sample_num++ ) {
+        for( bg_sample_num = 0; bg_sample_num < bg_samples; ) {
 
             bg_pos = S[i].pos + (pos)ceil( rand_trunc_gauss( offset_std, -100, 100 ) );
 
             if( S[i].strand ) {
-                if( bg_pos < R || S[i].pos >= seqlen - L ) continue;
+                if( bg_pos < R || bg_pos >= seqlen - L ) continue;
                 memcpy( local_seq, seq + bg_pos - R, (L+1+R)*sizeof(char) );
                 seqrc( local_seq, L+1+R );
             }
             else {
-                if( bg_pos < L || S[i].pos >= seqlen - R ) continue;
+                if( bg_pos < L || bg_pos >= seqlen - R ) continue;
                 memcpy( local_seq, seq + (bg_pos-L), (L+1+R)*sizeof(char) );
             }
 
             training_seqs.push_back( new sequence( local_seq, 0 ) );
+            bg_sample_num++;
         }
     }
 

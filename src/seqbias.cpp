@@ -1,17 +1,26 @@
 
 #include "sequencing_bias.hpp"
+#include <algorithm>
 
 extern "C" {
 
 #include "samtools/faidx.h"
 #include "samtools/sam.h"
-#include "asprintf.h"
 
 #include <R.h>
 #include <Rinternals.h>
 #include <Rdefines.h>
 #include <R_ext/Rdynload.h>
 #include <stdio.h>
+
+// more R namespace pollution
+#if defined(nrows)
+#undef nrows
+#endif
+
+#if defined(ncols)
+#undef ncols
+#endif
 
 
 typedef struct {
@@ -26,9 +35,9 @@ void coerce_genomic_coords( SEXP seqname,
                             SEXP end,
                             SEXP strand,
                             const char** c_seqname,
-                            pos*         c_start,
-                            pos*         c_end,
-                            int*         c_strand )
+                            pos_t*       c_start,
+                            pos_t*       c_end,
+                            strand_t*    c_strand )
 {
     if( !IS_CHARACTER(seqname) || LENGTH(seqname) != 1 ) error( "seqname must be character(1)" );
     *c_seqname = translateChar( STRING_ELT( seqname, 0 ) );
@@ -48,9 +57,9 @@ void coerce_genomic_coords( SEXP seqname,
 
     if( strlen(c_strand_str) != 1 ) error( "strand should be be one character" );
 
-    if( c_strand_str[0] == '+' )      *c_strand = 0;
-    else if( c_strand_str[0] == '-' ) *c_strand = 1;
-    else                              *c_strand = -1;
+    if( c_strand_str[0] == '+' )      *c_strand = strand_pos;
+    else if( c_strand_str[0] == '-' ) *c_strand = strand_neg;
+    else                              *c_strand = strand_na;
 }
 
 
@@ -136,8 +145,8 @@ SEXP seqbias_predict( SEXP seqbias,
 
 
     const char* c_seqname;
-    pos c_start, c_end;
-    int c_strand;
+    pos_t c_start, c_end;
+    strand_t c_strand;
 
     coerce_genomic_coords( seqname, start, end, strand,
                            &c_seqname, &c_start, &c_end, &c_strand );
@@ -213,8 +222,8 @@ SEXP seqbias_count_reads( SEXP bam_ptr,
     indexed_bam_f* c_bam_ptr = (indexed_bam_f*)EXTPTR_PTR( bam_ptr );
 
     const char* c_seqname;
-    pos c_start, c_end;
-    int c_strand;
+    pos_t c_start, c_end;
+    strand_t c_strand;
 
     coerce_genomic_coords( seqname, start, end, strand,
                            &c_seqname, &c_start, &c_end, &c_strand );
@@ -223,16 +232,19 @@ SEXP seqbias_count_reads( SEXP bam_ptr,
     /* init vector */
     SEXP v;
     PROTECT( v = allocVector( REALSXP, c_end - c_start + 1 ) );
-    pos i;
+    pos_t i;
     for( i = 0; i < c_end - c_start + 1; i++ ) REAL(v)[i] = 0;
 
 
-    char* region;
+    const size_t region_len = 1024;
+    char* region = new char[region_len];
+
     int bam_ref_id, bam_start, bam_end, err;
-    err = asprintf( &region, "%s:%ld-%ld", c_seqname, c_start, c_end );
+    err = snprintf(region, region_len, "%s:%ld-%ld", c_seqname, c_start, c_end );
     err = bam_parse_region( c_bam_ptr->f->header, region,
                             &bam_ref_id, &bam_start, &bam_end );
-    free(region);
+
+    delete [] region;
 
     /* if the region is not present in the bam file index, just return 0's */
     if( err != 0 || bam_ref_id < 0 ) {
@@ -243,7 +255,7 @@ SEXP seqbias_count_reads( SEXP bam_ptr,
 
     bam_iter_t it = bam_iter_query( c_bam_ptr->idx, bam_ref_id, bam_start, bam_end );
     bam1_t* b = bam_init1();
-    pos x;
+    pos_t x;
 
     while( bam_iter_read( c_bam_ptr->f->x.bam, it, b ) > 0 ) {
         if( bam1_strand(b) !=  c_strand ) continue;
@@ -251,7 +263,9 @@ SEXP seqbias_count_reads( SEXP bam_ptr,
         if( c_start <= x && x <= c_end ) REAL(v)[x - c_start]++;
     }
 
-    if( c_strand == 1 ) rev( REAL(v), c_end - c_start + 1 );
+    if( c_strand == strand_neg ) {
+        std::reverse(REAL(v), REAL(v) + (c_end - c_start + 1));
+    }
 
     bam_iter_destroy( it );
     bam_destroy1(b);
@@ -284,7 +298,7 @@ SEXP seqbias_alloc_kmer_matrix( SEXP n, SEXP k )
     }
 
     kmer_matrix* c_M = new kmer_matrix( c_n, c_k );
-    c_M->setall( 0.0 );
+    c_M->set_all( 0.0 );
 
     SEXP M = R_MakeExternalPtr( (void*)c_M, R_NilValue, R_NilValue );
     R_RegisterCFinalizer( M, dealloc_kmer_matrix );
@@ -306,12 +320,12 @@ SEXP seqbias_tally_kmers( SEXP M, SEXP seq, SEXP count, SEXP offset )
     if( !IS_NUMERIC(count) ) error( "count must be numeric" );
 
     if( !IS_INTEGER(offset) ) error( "offset must be an integer" );
-    pos c_offset = asInteger(offset);
+    pos_t c_offset = asInteger(offset);
 
     size_t n = strlen(c_seq);
     if( (size_t)LENGTH(count) != n ) error( "sequence length mismatches count length" );
 
-    size_t k = c_M->getk();
+    size_t k = c_M->ksize();
 
     /*
      * Convert the sequence to an array of kmers.
@@ -325,7 +339,7 @@ SEXP seqbias_tally_kmers( SEXP M, SEXP seq, SEXP count, SEXP offset )
     memset( ks, 0, (n - (k - 1)) * sizeof(kmer) );
     kmer K = 0;
     for( i = 0; i < n; i++ ) {
-        K = ((K << 2) | nt2num(c_seq[i])) & kmer_mask;
+        K = ((K << 2) | nuc_to_num(c_seq[i])) & kmer_mask;
         if( i >= k-1 ) ks[i-(k-1)] = K;
     }
 
@@ -333,14 +347,14 @@ SEXP seqbias_tally_kmers( SEXP M, SEXP seq, SEXP count, SEXP offset )
     /*
      * Walk through the count array tallying kmers.
      */
-    pos j;
+    pos_t j;
     for( i = 0; i < n; i++ ) {
-        if( (pos)i >= c_offset &&
-            (pos)i - c_offset + c_M->getn() <= n &&
+        if( (pos_t)i >= c_offset &&
+            (pos_t)i - c_offset + c_M->nrows() <= n &&
             REAL(count)[i] > 0.0 )
         {
-            for( j = 0; (size_t)j < c_M->getn(); j++ ) {
-                (*c_M)( j, ks[(pos)i - c_offset + j] ) += REAL(count)[i];
+            for( j = 0; (size_t)j < c_M->nrows(); j++ ) {
+                (*c_M)( j, ks[(pos_t)i - c_offset + j] ) += REAL(count)[i];
                 //(*c_M)( j, ks[i - c_offset + j] ) += 1;
             }
         }
@@ -358,21 +372,21 @@ SEXP seqbias_dataframe_from_kmer_matrix( SEXP M, SEXP offset )
     kmer_matrix* c_M = (kmer_matrix*)EXTPTR_PTR(M);
 
     if( !IS_INTEGER(offset) ) error( "offset must be an integer" );
-    pos c_offset = asInteger(offset);
+    pos_t c_offset = asInteger(offset);
 
     /* normalize to get a probability distribution */
-    c_M->dist_normalize();
+    c_M->make_distribution();
 
-    size_t n = c_M->getn();
-    size_t m = c_M->getm();
-    size_t k = c_M->getk();
+    size_t n = c_M->nrows();
+    size_t m = c_M->ncols();
+    size_t k = c_M->ksize();
 
     SEXP poss, seqs, freqs;
     PROTECT( poss  = allocVector( REALSXP, n*m ) );
     PROTECT( seqs  = allocVector( STRSXP,  n*m ) );
     PROTECT( freqs = allocVector( REALSXP, n*m ) );
 
-    pos i;
+    pos_t i;
     kmer K;
 
     char* Kstr = new char[k+1];
@@ -384,7 +398,7 @@ SEXP seqbias_dataframe_from_kmer_matrix( SEXP M, SEXP offset )
             REAL(poss)[i*m+K] = i - c_offset;
 
             /* set seq */
-            num2nt( K, Kstr, k );
+            num_to_nuc(Kstr, K, k);
             SET_STRING_ELT( seqs, i*m+K, mkChar( Kstr ) );
 
             /* set freq */

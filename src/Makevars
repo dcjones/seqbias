@@ -1,8 +1,5 @@
 include Makevars.common
 
-PKG_CFLAGS   += -D_GNU_SOURCE
-PKG_CXXFLAGS += -D_GNU_SOURCE
-
 OBJECTS = $(SEQBIAS_OBJ) \
 		  $(YAML_CPP_OBJ:%=yaml-cpp/%)
 

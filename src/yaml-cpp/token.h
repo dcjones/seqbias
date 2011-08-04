@@ -1,11 +1,13 @@
-#pragma once
-
 #ifndef TOKEN_H_62B23520_7C8E_11DE_8A39_0800200C9A66
 #define TOKEN_H_62B23520_7C8E_11DE_8A39_0800200C9A66
 
+#if !defined(__GNUC__) || (__GNUC__ == 3 && __GNUC_MINOR__ >= 4) || (__GNUC__ >= 4) // GCC supports "pragma once" correctly since 3.4
+#pragma once
+#endif
 
-#include "mark.h"
-#include <ios>
+
+#include "yaml-cpp/mark.h"
+#include <iostream>
 #include <string>
 #include <vector>
 
@@ -57,9 +59,10 @@ namespace YAML
 			ANCHOR,
 			ALIAS,
 			TAG,
-			SCALAR
+			PLAIN_SCALAR,
+			NON_PLAIN_SCALAR
 		};
-				
+
 		// data
 		Token(TYPE type_, const Mark& mark_): status(VALID), type(type_), mark(mark_), data(0) {}
 

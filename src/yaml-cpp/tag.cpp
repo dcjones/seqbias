@@ -1,7 +1,8 @@
 #include "tag.h"
+#include "directives.h"
 #include "token.h"
-#include "parserstate.h"
 #include <cassert>
+#include <stdexcept>
 
 namespace YAML
 {
@@ -28,23 +29,24 @@ namespace YAML
 		}
 	}
 
-	const std::string Tag::Translate(const ParserState& state)
+	const std::string Tag::Translate(const Directives& directives)
 	{
 		switch(type) {
 			case VERBATIM:
 				return value;
 			case PRIMARY_HANDLE:
-				return state.TranslateTagHandle("!") + value;
+				return directives.TranslateTagHandle("!") + value;
 			case SECONDARY_HANDLE:
-				return state.TranslateTagHandle("!!") + value;
+				return directives.TranslateTagHandle("!!") + value;
 			case NAMED_HANDLE:
-				return state.TranslateTagHandle("!" + handle + "!") + value;
+				return directives.TranslateTagHandle("!" + handle + "!") + value;
 			case NON_SPECIFIC:
 				// TODO:
 				return "!";
 			default:
 				assert(false);
 		}
+		throw std::runtime_error("yaml-cpp: internal error, bad tag type");
 	}
 }
 

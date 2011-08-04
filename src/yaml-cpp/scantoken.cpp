@@ -1,6 +1,6 @@
 #include "scanner.h"
 #include "token.h"
-#include "exceptions.h"
+#include "yaml-cpp/exceptions.h"
 #include "exp.h"
 #include "scanscalar.h"
 #include "scantag.h"
@@ -238,7 +238,7 @@ namespace YAML
 		alias = (indicator == Keys::Alias);
 
 		// now eat the content
-		while(Exp::AlphaNumeric().Matches(INPUT))
+		while(INPUT && Exp::Anchor().Matches(INPUT))
 			name += INPUT.get();
 
 		// we need to have read SOMETHING!
@@ -276,7 +276,12 @@ namespace YAML
 		} else {
 			bool canBeHandle;
 			token.value = ScanTagHandle(INPUT, canBeHandle);
-			token.data = (token.value.empty() ? Tag::SECONDARY_HANDLE : Tag::PRIMARY_HANDLE);
+			if(!canBeHandle && token.value.empty())
+				token.data = Tag::NON_SPECIFIC;
+			else if(token.value.empty())
+				token.data = Tag::SECONDARY_HANDLE;
+			else
+				token.data = Tag::PRIMARY_HANDLE;
 			
 			// is there a suffix?
 			if(canBeHandle && INPUT.peek() == Keys::Tag) {
@@ -321,7 +326,7 @@ namespace YAML
 		//if(Exp::IllegalCharInScalar.Matches(INPUT))
 		//	throw ParserException(INPUT.mark(), ErrorMsg::CHAR_IN_SCALAR);
 
-		Token token(Token::SCALAR, mark);
+		Token token(Token::PLAIN_SCALAR, mark);
 		token.value = scalar;
 		m_tokens.push(token);
 	}
@@ -360,7 +365,7 @@ namespace YAML
 		m_simpleKeyAllowed = false;
 		m_canBeJSONFlow = true;
 
-		Token token(Token::SCALAR, mark);
+		Token token(Token::NON_PLAIN_SCALAR, mark);
 		token.value = scalar;
 		m_tokens.push(token);
 	}
@@ -427,7 +432,7 @@ namespace YAML
 		m_simpleKeyAllowed = true;
 		m_canBeJSONFlow = false;
 
-		Token token(Token::SCALAR, mark);
+		Token token(Token::NON_PLAIN_SCALAR, mark);
 		token.value = scalar;
 		m_tokens.push(token);
 	}

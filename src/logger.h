@@ -1,28 +1,28 @@
+/*
+ * This file is part of Isolator.
+ *
+ * Copyright (c) 2011 by Daniel C. Jones <dcjones@cs.washington.edu>
+ *
+ */
 
-#ifndef PEAKOLATOR_LOGGER
-#define PEAKOLATOR_LOGGER
+#ifndef PEAKOLATOR_LOGGER_H
+#define PEAKOLATOR_LOGGER_H
+
+/**
+ * \file
+ * \brief C interface to the log writer class.
+ *
+ * I have a few pure C source files still, and I want everything to use the same
+ * logging sysetm, thus I provide a minimal C interface.
+ */
+
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 
-typedef enum {
-    LOG_ERROR=0,
-    LOG_WARN=1,
-    LOG_MSG=2,
-    LOG_BLAB=3
-} log_vl;
-
-
-void log_puts( int vl, const char* msg );
-void log_printf( int vl, const char* fmt, ... );
-void log_indent(void);
-void log_unindent(void);
-void log_verbosity(int);
-
-void fail( const char* msg );
-void failf( const char* fmt, ... );
+void logger_abort(const char* fmt, ...);
 
 
 #ifdef __cplusplus

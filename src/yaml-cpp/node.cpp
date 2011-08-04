@@ -1,34 +1,29 @@
-#include "node.h"
-#include "token.h"
-#include "scanner.h"
-#include "content.h"
-#include "parser.h"
-#include "scalar.h"
-#include "sequence.h"
-#include "map.h"
-#include "aliascontent.h"
+#include "yaml-cpp/node.h"
 #include "iterpriv.h"
-#include "emitter.h"
+#include "nodebuilder.h"
+#include "nodeownership.h"
+#include "scanner.h"
 #include "tag.h"
+#include "token.h"
+#include "yaml-cpp/aliasmanager.h"
+#include "yaml-cpp/emitfromevents.h"
+#include "yaml-cpp/emitter.h"
+#include "yaml-cpp/eventhandler.h"
+#include <cassert>
 #include <stdexcept>
 
 namespace YAML
 {
-	// the ordering!
-	bool ltnode::operator ()(const Node *pNode1, const Node *pNode2) const
-	{
+	bool ltnode::operator()(const Node *pNode1, const Node *pNode2) const {
 		return *pNode1 < *pNode2;
 	}
 
-	Node::Node(): m_pContent(0), m_alias(false), m_pIdentity(this), m_referenced(true)
+	Node::Node(): m_pOwnership(new NodeOwnership), m_type(NodeType::Null)
 	{
 	}
 
-	Node::Node(const Mark& mark, const std::string& anchor, const std::string& tag, const Content *pContent)
-	: m_mark(mark), m_anchor(anchor), m_tag(tag), m_pContent(0), m_alias(false), m_pIdentity(this), m_referenced(false)
+	Node::Node(NodeOwnership& owner): m_pOwnership(new NodeOwnership(&owner)), m_type(NodeType::Null)
 	{
-		if(pContent)
-			m_pContent = pContent->Clone();
 	}
 
 	Node::~Node()
@@ -38,174 +33,124 @@ namespace YAML
 
 	void Node::Clear()
 	{
-		delete m_pContent;
-		m_pContent = 0;
-		m_alias = false;
-		m_referenced = false;
-		m_anchor.clear();
+		m_pOwnership.reset(new NodeOwnership);
+		m_type = NodeType::Null;
 		m_tag.clear();
+		m_scalarData.clear();
+		m_seqData.clear();
+		m_mapData.clear();
 	}
 	
+	bool Node::IsAliased() const
+	{
+		return m_pOwnership->IsAliased(*this);
+	}
+
+	Node& Node::CreateNode()
+	{
+		return m_pOwnership->Create();
+	}
+
 	std::auto_ptr<Node> Node::Clone() const
 	{
-		if(m_alias)
-			throw std::runtime_error("yaml-cpp: Can't clone alias");  // TODO: what to do about aliases?
-		
-		return std::auto_ptr<Node> (new Node(m_mark, m_anchor, m_tag, m_pContent));
+		std::auto_ptr<Node> pNode(new Node);
+		NodeBuilder nodeBuilder(*pNode);
+		EmitEvents(nodeBuilder);
+		return pNode;
 	}
 
-	void Node::Parse(Scanner *pScanner, ParserState& state)
+	void Node::EmitEvents(EventHandler& eventHandler) const
+	{
+		eventHandler.OnDocumentStart(m_mark);
+		AliasManager am;
+		EmitEvents(am, eventHandler);
+		eventHandler.OnDocumentEnd();
+	}
+
+	void Node::EmitEvents(AliasManager& am, EventHandler& eventHandler) const
+	{
+		anchor_t anchor = NullAnchor;
+		if(IsAliased()) {
+			anchor = am.LookupAnchor(*this);
+			if(anchor) {
+				eventHandler.OnAlias(m_mark, anchor);
+				return;
+			}
+			
+			am.RegisterReference(*this);
+			anchor = am.LookupAnchor(*this);
+		}
+		
+		switch(m_type) {
+			case NodeType::Null:
+				eventHandler.OnNull(m_mark, anchor);
+				break;
+			case NodeType::Scalar:
+				eventHandler.OnScalar(m_mark, m_tag, anchor, m_scalarData);
+				break;
+			case NodeType::Sequence:
+				eventHandler.OnSequenceStart(m_mark, m_tag, anchor);
+				for(std::size_t i=0;i<m_seqData.size();i++)
+					m_seqData[i]->EmitEvents(am, eventHandler);
+				eventHandler.OnSequenceEnd();
+				break;
+			case NodeType::Map:
+				eventHandler.OnMapStart(m_mark, m_tag, anchor);
+				for(node_map::const_iterator it=m_mapData.begin();it!=m_mapData.end();++it) {
+					it->first->EmitEvents(am, eventHandler);
+					it->second->EmitEvents(am, eventHandler);
+				}
+				eventHandler.OnMapEnd();
+				break;
+		}
+	}
+
+	void Node::Init(NodeType::value type, const Mark& mark, const std::string& tag)
 	{
 		Clear();
-
-		// an empty node *is* a possibility
-		if(pScanner->empty())
-			return;
-
-		// save location
-		m_mark = pScanner->peek().mark;
-		
-		// special case: a value node by itself must be a map, with no header
-		if(pScanner->peek().type == Token::VALUE) {
-			m_pContent = new Map;
-			m_pContent->Parse(pScanner, state);
-			return;
-		}
-
-		ParseHeader(pScanner, state);
-
-		// is this an alias? if so, its contents are an alias to
-		// a previously defined anchor
-		if(m_alias) {
-			// the scanner throws an exception if it doesn't know this anchor name
-			const Node *pReferencedNode = pScanner->Retrieve(m_anchor);
-			m_pIdentity = pReferencedNode;
-
-			// mark the referenced node for the sake of the client code
-			pReferencedNode->m_referenced = true;
-
-			// use of an Alias object keeps the referenced content from
-			// being deleted twice
-			Content *pAliasedContent = pReferencedNode->m_pContent;
-			if(pAliasedContent)
-				m_pContent = new AliasContent(pAliasedContent);
-			
-			return;
-		}
-
-		// now split based on what kind of node we should be
-		switch(pScanner->peek().type) {
-			case Token::SCALAR:
-				m_pContent = new Scalar;
-				break;
-			case Token::FLOW_SEQ_START:
-			case Token::BLOCK_SEQ_START:
-				m_pContent = new Sequence;
-				break;
-			case Token::FLOW_MAP_START:
-			case Token::BLOCK_MAP_START:
-				m_pContent = new Map;
-				break;
-			case Token::KEY:
-				// compact maps can only go in a flow sequence
-				if(state.GetCurCollectionType() == ParserState::FLOW_SEQ)
-					m_pContent = new Map;
-				break;
-			default:
-				break;
-		}
-
-		// Have to save anchor before parsing to allow for aliases as
-		// contained node (recursive structure)
-		if(!m_anchor.empty())
-			pScanner->Save(m_anchor, this);
-
-		if(m_pContent)
-			m_pContent->Parse(pScanner, state);
+		m_mark = mark;
+		m_type = type;
+		m_tag = tag;
 	}
 
-	// ParseHeader
-	// . Grabs any tag, alias, or anchor tokens and deals with them.
-	void Node::ParseHeader(Scanner *pScanner, ParserState& state)
+	void Node::MarkAsAliased()
 	{
-		while(1) {
-			if(pScanner->empty())
-				return;
-
-			switch(pScanner->peek().type) {
-				case Token::TAG: ParseTag(pScanner, state); break;
-				case Token::ANCHOR: ParseAnchor(pScanner, state); break;
-				case Token::ALIAS: ParseAlias(pScanner, state); break;
-				default: return;
-			}
-		}
-	}
-
-	void Node::ParseTag(Scanner *pScanner, ParserState& state)
-	{
-		Token& token = pScanner->peek();
-		if(m_tag != "")
-			throw ParserException(token.mark, ErrorMsg::MULTIPLE_TAGS);
-
-		Tag tag(token);
-		m_tag = tag.Translate(state);
-		pScanner->pop();
+		m_pOwnership->MarkAsAliased(*this);
 	}
 	
-	void Node::ParseAnchor(Scanner *pScanner, ParserState& /*state*/)
+	void Node::SetScalarData(const std::string& data)
 	{
-		Token& token = pScanner->peek();
-		if(m_anchor != "")
-			throw ParserException(token.mark, ErrorMsg::MULTIPLE_ANCHORS);
-
-		m_anchor = token.value;
-		m_alias = false;
-		pScanner->pop();
+		assert(m_type == NodeType::Scalar); // TODO: throw?
+		m_scalarData = data;
 	}
 
-	void Node::ParseAlias(Scanner *pScanner, ParserState& /*state*/)
+	void Node::Append(Node& node)
 	{
-		Token& token = pScanner->peek();
-		if(m_anchor != "")
-			throw ParserException(token.mark, ErrorMsg::MULTIPLE_ALIASES);
-		if(m_tag != "")
-			throw ParserException(token.mark, ErrorMsg::ALIAS_CONTENT);
-
-		m_anchor = token.value;
-		m_alias = true;
-		pScanner->pop();
+		assert(m_type == NodeType::Sequence); // TODO: throw?
+		m_seqData.push_back(&node);
 	}
-
-	CONTENT_TYPE Node::GetType() const
+	
+	void Node::Insert(Node& key, Node& value)
 	{
-		if(!m_pContent)
-			return CT_NONE;
-
-		if(m_pContent->IsScalar())
-			return CT_SCALAR;
-		else if(m_pContent->IsSequence())
-			return CT_SEQUENCE;
-		else if(m_pContent->IsMap())
-			return CT_MAP;
-			
-		return CT_NONE;
+		assert(m_type == NodeType::Map); // TODO: throw?
+		m_mapData[&key] = &value;
 	}
 
 	// begin
 	// Returns an iterator to the beginning of this (sequence or map).
 	Iterator Node::begin() const
 	{
-		if(!m_pContent)
-			return Iterator();
-
-		std::vector <Node *>::const_iterator seqIter;
-		if(m_pContent->GetBegin(seqIter))
-			return Iterator(new IterPriv(seqIter));
-
-		std::map <Node *, Node *, ltnode>::const_iterator mapIter;
-		if(m_pContent->GetBegin(mapIter))
-			return Iterator(new IterPriv(mapIter));
-
+		switch(m_type) {
+			case NodeType::Null:
+			case NodeType::Scalar:
+				return Iterator();
+			case NodeType::Sequence:
+				return Iterator(std::auto_ptr<IterPriv>(new IterPriv(m_seqData.begin())));
+			case NodeType::Map:
+				return Iterator(std::auto_ptr<IterPriv>(new IterPriv(m_mapData.begin())));
+		}
+		
+		assert(false);
 		return Iterator();
 	}
 
@@ -213,87 +158,108 @@ namespace YAML
 	// . Returns an iterator to the end of this (sequence or map).
 	Iterator Node::end() const
 	{
-		if(!m_pContent)
-			return Iterator();
-
-		std::vector <Node *>::const_iterator seqIter;
-		if(m_pContent->GetEnd(seqIter))
-			return Iterator(new IterPriv(seqIter));
-
-		std::map <Node *, Node *, ltnode>::const_iterator mapIter;
-		if(m_pContent->GetEnd(mapIter))
-			return Iterator(new IterPriv(mapIter));
-
+		switch(m_type) {
+			case NodeType::Null:
+			case NodeType::Scalar:
+				return Iterator();
+			case NodeType::Sequence:
+				return Iterator(std::auto_ptr<IterPriv>(new IterPriv(m_seqData.end())));
+			case NodeType::Map:
+				return Iterator(std::auto_ptr<IterPriv>(new IterPriv(m_mapData.end())));
+		}
+		
+		assert(false);
 		return Iterator();
 	}
 
 	// size
-	// . Returns the size of this node, if it's a sequence node.
+	// . Returns the size of a sequence or map node
 	// . Otherwise, returns zero.
 	std::size_t Node::size() const
 	{
-		if(!m_pContent)
-			return 0;
-
-		return m_pContent->GetSize();
+		switch(m_type) {
+			case NodeType::Null:
+			case NodeType::Scalar:
+				return 0;
+			case NodeType::Sequence:
+				return m_seqData.size();
+			case NodeType::Map:
+				return m_mapData.size();
+		}
+		
+		assert(false);
+		return 0;
 	}
 
 	const Node *Node::FindAtIndex(std::size_t i) const
 	{
-		if(!m_pContent)
-			return 0;
-		
-		return m_pContent->GetNode(i);
+		if(m_type == NodeType::Sequence)
+			return m_seqData[i];
+		return 0;
 	}
 
 	bool Node::GetScalar(std::string& s) const
 	{
-		if(!m_pContent) {
-			if(m_tag.empty())
+		switch(m_type) {
+			case NodeType::Null:
 				s = "~";
-			else
-				s = "";
-			return true;
+				return true;
+			case NodeType::Scalar:
+				s = m_scalarData;
+				return true;
+			case NodeType::Sequence:
+			case NodeType::Map:
+				return false;
 		}
 		
-		return m_pContent->GetScalar(s);
+		assert(false);
+		return false;
 	}
 
 	Emitter& operator << (Emitter& out, const Node& node)
 	{
-		// write anchor/alias
-		if(node.m_anchor != "") {
-			if(node.m_alias)
-				out << Alias(node.m_anchor);
-			else
-				out << Anchor(node.m_anchor);
-		}
-
-		if(node.m_tag != "")
-			out << VerbatimTag(node.m_tag);
-
-		// write content
-		if(node.m_pContent)
-			node.m_pContent->Write(out);
-		else if(!node.m_alias)
-			out << Null;
-
+		EmitFromEvents emitFromEvents(out);
+		node.EmitEvents(emitFromEvents);
 		return out;
 	}
 
 	int Node::Compare(const Node& rhs) const
 	{
-		// Step 1: no content is the smallest
-		if(!m_pContent) {
-			if(rhs.m_pContent)
-				return -1;
-			else
+		if(m_type != rhs.m_type)
+			return rhs.m_type - m_type;
+		
+		switch(m_type) {
+			case NodeType::Null:
+				return 0;
+			case NodeType::Scalar:
+				return m_scalarData.compare(rhs.m_scalarData);
+			case NodeType::Sequence:
+				if(m_seqData.size() < rhs.m_seqData.size())
+					return 1;
+				else if(m_seqData.size() > rhs.m_seqData.size())
+					return -1;
+				for(std::size_t i=0;i<m_seqData.size();i++)
+					if(int cmp = m_seqData[i]->Compare(*rhs.m_seqData[i]))
+						return cmp;
+				return 0;
+			case NodeType::Map:
+				if(m_mapData.size() < rhs.m_mapData.size())
+					return 1;
+				else if(m_mapData.size() > rhs.m_mapData.size())
+					return -1;
+				node_map::const_iterator it = m_mapData.begin();
+				node_map::const_iterator jt = rhs.m_mapData.begin();
+				for(;it!=m_mapData.end() && jt!=rhs.m_mapData.end();it++, jt++) {
+					if(int cmp = it->first->Compare(*jt->first))
+						return cmp;
+					if(int cmp = it->second->Compare(*jt->second))
+						return cmp;
+				}
 				return 0;
 		}
-		if(!rhs.m_pContent)
-			return 1;
-
-		return m_pContent->Compare(rhs.m_pContent);
+		
+		assert(false);
+		return 0;
 	}
 
 	bool operator < (const Node& n1, const Node& n2)

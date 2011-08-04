@@ -1,10 +1,7 @@
 include Makevars.common
 
-PKG_CPPFLAGS+=-DNEED_ASPRINTF
-
 OBJECTS = $(SEQBIAS_OBJ) \
-		  $(YAML_CPP_OBJ:%=yaml-cpp/%) \
-		  $(GNULIB_OBJ:%=gnulib/%)
+		  $(YAML_CPP_OBJ:%=yaml-cpp/%)
 
 all : $(SHLIB)
 

@@ -1,7 +1,7 @@
 #include "emitterutils.h"
 #include "exp.h"
 #include "indentation.h"
-#include "exceptions.h"
+#include "yaml-cpp/exceptions.h"
 #include "stringsource.h"
 #include <sstream>
 #include <iomanip>
@@ -294,12 +294,13 @@ namespace YAML
 			return WriteAliasName(out, str);
 		}
 
-		bool WriteTag(ostream& out, const std::string& str)
+		bool WriteTag(ostream& out, const std::string& str, bool verbatim)
 		{
-			out << "!<";
+			out << (verbatim ? "!<" : "!");
 			StringCharSource buffer(str.c_str(), str.size());
+			const RegEx& reValid = verbatim ? Exp::URI() : Exp::Tag();
 			while(buffer) {
-				int n = Exp::URI().Match(buffer);
+				int n = reValid.Match(buffer);
 				if(n <= 0)
 					return false;
 
@@ -308,7 +309,75 @@ namespace YAML
 					++buffer;
 				}
 			}
-			out << ">";
+			if (verbatim)
+				out << ">";
+			return true;
+		}
+
+		bool WriteTagWithPrefix(ostream& out, const std::string& prefix, const std::string& tag)
+		{
+			out << "!";
+			StringCharSource prefixBuffer(prefix.c_str(), prefix.size());
+			while(prefixBuffer) {
+				int n = Exp::URI().Match(prefixBuffer);
+				if(n <= 0)
+					return false;
+				
+				while(--n >= 0) {
+					out << prefixBuffer[0];
+					++prefixBuffer;
+				}
+			}
+
+			out << "!";
+			StringCharSource tagBuffer(tag.c_str(), tag.size());
+			while(tagBuffer) {
+				int n = Exp::Tag().Match(tagBuffer);
+				if(n <= 0)
+					return false;
+				
+				while(--n >= 0) {
+					out << tagBuffer[0];
+					++tagBuffer;
+				}
+			}
+			return true;
+		}
+
+		bool WriteBinary(ostream& out, const char *data, std::size_t size)
+		{
+			static const char encoding[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+			const char PAD = '=';
+			
+			out << "\"";
+			std::size_t chunks = size / 3;
+			std::size_t remainder = size % 3;
+
+			for(std::size_t i=0;i<chunks;i++, data += 3) {
+				out << encoding[data[0] >> 2];
+				out << encoding[((data[0] & 0x3) << 4) | (data[1] >> 4)];
+				out << encoding[((data[1] & 0xf) << 2) | (data[2] >> 6)];
+				out << encoding[data[2] & 0x3f];
+			}
+			
+			switch(remainder) {
+				case 0:
+					break;
+				case 1:
+					out << encoding[data[0] >> 2];
+					out << encoding[((data[0] & 0x3) << 4)];
+					out << PAD;
+					out << PAD;
+					break;
+				case 2:
+					out << encoding[data[0] >> 2];
+					out << encoding[((data[0] & 0x3) << 4) | (data[1] >> 4)];
+					out << encoding[((data[1] & 0xf) << 2)];
+					out << PAD;
+					break;
+			}
+			
+			out << "\"";
 			return true;
 		}
 	}
